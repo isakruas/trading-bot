@@ -1,68 +1,50 @@
-# Makefile for trading-bot CLI
-# Cross-platform: Linux/macOS & Windows (CMD)
+# Makefile – multi-arch Linux & Windows + GitHub release
 
-# ——————————————————————————————
-# CONFIGURATION
-# ——————————————————————————————
+BINARY_NAME       := trading-bot
+BUILD_DIR         := bin
+PKG               := trading-bot
+CLI               := cmd/cli/main.go
 
-BINARY_NAME        := trading-bot
-BUILD_DIR          := bin
+GO                := go
+OS_LIST := linux windows darwin freebsd netbsd openbsd dragonfly solaris aix android illumos ios js wasip1 hurd plan9
 
-# Windows needs .exe
-ifeq ($(OS),Windows_NT)
-  EXT := .exe
-else
-  EXT :=
-endif
-
-BINARY             := $(BUILD_DIR)/$(BINARY_NAME)$(EXT)
-PKG                := trading-bot
-CLI                := cmd/cli/main.go
-
-GO                 := go
-GOOS               := $(shell go env GOOS)
-GOARCH             := $(shell go env GOARCH)
-
-# Build date in UTC
-ifeq ($(OS),Windows_NT)
-  # Powershell call; assuming PowerShell is on the PATH
-  BUILDDATE := $(shell powershell -Command "Get-Date -Format yyyy-MM-ddTHH:mm:ssZ")
-else
-  BUILDDATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-endif
-
-CODEVERSION        := 0.0.1
-
-ifeq ($(OS),Windows_NT)
-  CODEBUILDREVISION := $(shell powershell -Command "git rev-parse HEAD")
-else
-  CODEBUILDREVISION := $(shell git rev-parse HEAD)
-endif
-
-# Platform‐specific helpers
-ifeq ($(OS),Windows_NT)
-  MKDIR := if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
-  RMDIR := if exist "$(BUILD_DIR)" rmdir /S /Q "$(BUILD_DIR)"
-  GOENV := set GOOS=$(GOOS)&& set GOARCH=$(GOARCH)&&
-else
-  MKDIR := mkdir -p $(BUILD_DIR)
-  RMDIR := rm -rf $(BUILD_DIR)
-  GOENV := GOOS=$(GOOS) GOARCH=$(GOARCH)
-endif
+# allow overriding on the command-line, e.g. make CODEVERSION=1.2.3
+CODEVERSION       ?= 0.0.1
+BUILDDATE         := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+CODEBUILDREVISION := $(shell git rev-parse HEAD)
 
 LDFLAGS := \
   -X $(PKG)/internal/interfaces/cli.CODEVERSION=$(CODEVERSION) \
   -X $(PKG)/internal/interfaces/cli.CODEBUILDDATE=$(BUILDDATE) \
   -X $(PKG)/internal/interfaces/cli.CODEBUILDREVISION=$(CODEBUILDREVISION)
 
-.PHONY: all build
+.PHONY: all build-all release clean
 
-all: build
+all: build-all
 
-build:
-	@$(MKDIR)
-	@echo Building $(BINARY_NAME) for $(GOOS)/$(GOARCH) version $(CODEVERSION)...
-	@$(GOENV) $(GO) build -v -buildvcs=false -ldflags "$(LDFLAGS)" \
-	  -o "$(BINARY)" "$(CLI)"
-	@echo Built: $(BINARY)
-	@echo Build complete.
+build-all:
+	@mkdir -p $(BUILD_DIR)
+	@echo "Building $(BINARY_NAME) for: $(OS_LIST)"
+	@for os in $(OS_LIST); do \
+	  arches="$$( $(GO) tool dist list | grep ^$$os/ | cut -d/ -f2 )"; \
+	  for arch in $$arches; do \
+	    ext=""; if [ "$$os" = "windows" ]; then ext=".exe"; fi; \
+	    out="$(BUILD_DIR)/$(BINARY_NAME)-$$os-$$arch$$ext"; \
+	    echo " → $$os/$$arch"; \
+	    GOOS=$$os GOARCH=$$arch $(GO) build -v -buildvcs=false \
+	      -ldflags "$(LDFLAGS)" \
+	      -o "$$out" "$(CLI)"; \
+	  done; \
+	done
+	@echo "All builds complete."
+
+release: build-all
+	@echo "Creating GitHub release v$(CODEVERSION)…"
+	@gh release create v$(CODEVERSION) $(BUILD_DIR)/* \
+	  --title "v$(CODEVERSION)" \
+	  --notes "Automated release of v$(CODEVERSION)"
+	@echo "Release v$(CODEVERSION) created and artifacts uploaded."
+
+clean:
+	@rm -rf $(BUILD_DIR)
+	@echo "Cleaned all build artifacts."
