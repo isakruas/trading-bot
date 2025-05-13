@@ -27,7 +27,7 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Set up GitHub CLI
-        uses: cli/gh-action@v2.0.0
+        uses: cli/gh-action@v2
         with:
           version: 'latest'
 
