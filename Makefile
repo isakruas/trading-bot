@@ -9,7 +9,7 @@ GO                := go
 OS_LIST := linux windows darwin freebsd netbsd openbsd dragonfly solaris aix android illumos ios js wasip1 hurd plan9
 
 # allow overriding on the command-line, e.g. make CODEVERSION=1.2.3
-CODEVERSION       ?= 0.0.1
+CODEVERSION       ?= $(shell ./scripts/next-version.sh)
 BUILDDATE         := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 CODEBUILDREVISION := $(shell git rev-parse HEAD)
 
