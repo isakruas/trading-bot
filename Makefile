@@ -32,8 +32,12 @@ else
 endif
 
 CODEVERSION        := 0.0.1
-# Try to get short git SHA; suppress errors and fall back to "unknown"
-CODEBUILDREVISION  := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+
+ifeq ($(OS),Windows_NT)
+  CODEBUILDREVISION := $(shell powershell -Command "git rev-parse HEAD")
+else
+  CODEBUILDREVISION := $(shell git rev-parse HEAD)
+endif
 
 # Platform‐specific helpers
 ifeq ($(OS),Windows_NT)
